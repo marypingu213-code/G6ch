@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學算式大挑戰</title>
+    <style>
+        :root {
+            --primary-color: #4A90E2;
+            --secondary-color: #F5A623;
+            --bg-color: #F0F4F8;
+            --correct-color: #7ED321;
+            --wrong-color: #D0021B;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #game-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .screen { display: none; }
+        .active { display: block; }
+
+        h1 { color: var(--primary-color); }
+        .btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1.2rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 10px;
+        }
+        .btn:hover { transform: scale(1.05); }
+
+        .question-text {
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            text-align: left;
+            background: #eef2f7;
+            padding: 15px;
+            border-left: 5px solid var(--primary-color);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .option-btn {
+            background: white;
+            border: 2px solid #ddd;
+            padding: 15px;
+            font-size: 1.1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .option-btn:hover {
+            border-color: var(--primary-color);
+            background: #f0f7ff;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            font-weight: bold;
+            height: 24px;
+        }
+
+        #stamp-area {
+            font-size: 2rem;
+            color: var(--correct-color);
+            margin: 20px 0;
+            display: none;
+        }
+
+        .quiet-remind {
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="lobby" class="screen active">
+        <h1>🧮 算式連連看大挑戰</h1>
+        <p>找出隱藏在故事背後的正確算式吧！</p>
+        <button class="btn" onclick="startGame()">進入遊戲</button>
+        <div class="quiet-remind">請安靜地思考，準備好了就開始！</div>
+    </div>
+
+    <div id="game" class="screen">
+        <div id="progress">第 1 / 5 題</div>
+        <div class="question-text" id="question">題目載入中...</div>
+        <div class="options-grid" id="options">
+            </div>
+        <div id="feedback" class="feedback"></div>
+    </div>
+
+    <div id="result" class="screen">
+        <h1>太棒了！</h1>
+        <p id="score-text"></p>
+        <div id="stamp-area">✨ 你可以去蓋印章了 ✨</div>
+        <button class="btn" onclick="resetGame()">重新挑戰</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            q: "爸爸有100元，買了15元的飲料3瓶，請問找回多少元？",
+            options: ["100 - 15 × 3", "(100 - 15) × 3", "100 - (15 + 3)", "100 + 15 × 3"],
+            correct: 0
+        },
+        {
+            q: "若涵買了4個30元的橡皮擦跟2個60元的自動鉛筆，請問需要付多少元？",
+            options: ["(30 + 60) × (4 + 2)", "30 × 4 + 60 × 2", "(30 × 4) - (60 × 2)", "30 × 60 + 4 × 2"],
+            correct: 1
+        },
+        {
+            q: "麵粉原本有100公克，一個小蛋糕需要15.2公克的麵粉，老師做了3個，請問還剩下多少麵粉？",
+            options: ["(100 - 15.2) × 3", "100 + 15.2 × 3", "100 - 15.2 × 3", "100 ÷ (15.2 × 3)"],
+            correct: 2
+        },
+        {
+            q: "一個三角形的面積是6平方公分，已知高是7.5公分，請問底是多少？",
+            options: ["6 × 7.5 ÷ 2", "6 ÷ 7.5", "6 × 2 ÷ 7.5", "(6 + 7.5) ÷ 2"],
+            correct: 2
+        },
+        {
+            q: "一個馬卡龍是2.5歐元，一個可麗露是3.8歐元，小華各買了4個，請問要付多少元？",
+            options: ["2.5 + 3.8 × 4", "(2.5 + 3.8) × 4", "(2.5 × 4) + 3.8", "2.5 + 3.8 + 4"],
+            correct: 1
+        }
+    ];
+
+    let currentQ = 0;
+    let score = 0;
+
+    function startGame() {
+        showScreen('game');
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        const qData = questions[currentQ];
+        document.getElementById('progress').innerText = `第 ${currentQ + 1} / ${questions.length} 題`;
+        document.getElementById('question').innerText = qData.q;
+        document.getElementById('feedback').innerText = '';
+        
+        const optionsDiv = document.getElementById('options');
+        optionsDiv.innerHTML = '';
+        
+        qData.options.forEach((opt, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(index);
+            optionsDiv.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(index) {
+        const qData = questions[currentQ];
+        const feedback = document.getElementById('feedback');
+        const btns = document.getElementsByClassName('option-btn');
+
+        if (index === qData.correct) {
+            score++;
+            feedback.style.color = 'var(--correct-color)';
+            feedback.innerText = '答對了！好棒！';
+            btns[index].style.background = '#e6f9e6';
+            btns[index].style.borderColor = 'var(--correct-color)';
+        } else {
+            feedback.style.color = 'var(--wrong-color)';
+            feedback.innerText = '再想一想算式的順序喔！';
+            btns[index].style.background = '#ffe6e6';
+            btns[index].style.borderColor = 'var(--wrong-color)';
+        }
+
+        // 鎖定所有按鈕防止重複點擊
+        for(let b of btns) b.disabled = true;
+
+        setTimeout(() => {
+            currentQ++;
+            if (currentQ < questions.length) {
+                loadQuestion();
+            } else {
+                showResult();
+            }
+        }, 1500);
+    }
+
+    function showResult() {
+        showScreen('result');
+        document.getElementById('score-text').innerText = `你完成了 ${questions.length} 道挑戰，答對了 ${score} 題！`;
+        if (score === questions.length) {
+            document.getElementById('stamp-area').style.display = 'block';
+        } else {
+            document.getElementById('stamp-area').style.display = 'none';
+        }
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function resetGame() {
+        currentQ = 0;
+        score = 0;
+        showScreen('lobby');
+    }
+</script>
+
+</body>
+</html>
